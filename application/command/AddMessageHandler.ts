@@ -10,9 +10,10 @@ export class AddMessageHandler {
     }
 
     async handle(command: AddMessageCommand): Promise<AddMessageResponse> {
-        const instruction: any[] = []
-        const history: any[] = []
-        const conversation = [
+        type MessageParam = Groq.Chat.Completions.ChatCompletionMessageParam;
+        const instruction: MessageParam[] = []
+        const history: MessageParam[] = []
+        const conversation: MessageParam[] = [
             ...instruction,
             ...history,
             {

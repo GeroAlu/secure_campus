@@ -4,8 +4,11 @@ import { useConversation } from '@/app/hooks/useConversation'
 import { useState, useRef, useEffect, FormEvent } from "react"
 import { useConversationStore, UserRole, Message } from '@/app/store/conversation'
 
+import { SignInButton, useAuth } from '@clerk/nextjs'
+
 export default function Home() {
-  const { conversation, clearConversation } = useConversationStore() as any
+  const { isLoaded, isSignedIn } = useAuth()
+  const { conversation, clearConversation } = useConversationStore()
   const [inputValue, setInputValue] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -32,6 +35,34 @@ export default function Home() {
       setIsLoading(false)
     }
   };
+
+  if (!isLoaded) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+        <div className="w-8 h-8 rounded-full border-4 border-zinc-300 dark:border-zinc-700 border-t-zinc-900 dark:border-t-zinc-100 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isSignedIn) {
+    return (
+      <main className="flex flex-col flex-1 items-center justify-center bg-white dark:bg-zinc-950 h-full w-full">
+        <div className="max-w-2xl text-center px-6">
+          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 mb-6">
+            Bienvenido a Secure Campus IA
+          </h1>
+          <p className="text-lg text-zinc-600 dark:text-zinc-400 mb-10 leading-relaxed">
+            Una plataforma académica inteligente y segura. Conéctate con una IA especializada que resolverá tus dudas, mantendrá registro de tus consultas y protegerá tu información bajo un estricto control de acceso y roles.
+          </p>
+          <SignInButton mode="modal">
+            <button className="px-8 py-4 text-base font-semibold text-white bg-blue-600 dark:bg-blue-500 rounded-full shadow-lg shadow-blue-500/30 hover:bg-blue-700 dark:hover:bg-blue-400 transform hover:scale-105 hover:shadow-xl transition-all duration-300">
+              Continuar con Google
+            </button>
+          </SignInButton>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="flex flex-col flex-1 items-center bg-zinc-50 font-sans dark:bg-zinc-950 h-full w-full overflow-hidden">
