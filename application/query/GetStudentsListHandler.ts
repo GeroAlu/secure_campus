@@ -1,4 +1,4 @@
-const HARDCODED_LIST = [
+export const HARDCODED_LIST = [
     { id: 1, name: 'Juan Pérez', email: 'juan.perez@example.com', active: true },
     { id: 2, name: 'María Gómez', email: 'maria.gomez@example.com', active: true },
     { id: 3, name: 'Carlos López', email: 'carlos.lopez@example.com', active: true },

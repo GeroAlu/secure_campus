@@ -20,8 +20,7 @@ export async function POST(req: Request) {
     })
   }
 
-  const payload = await req.json()
-  const body = JSON.stringify(payload)
+  const body = await req.text()
 
   const wh = new Webhook(WEBHOOK_SECRET)
   let evt: WebhookEvent
@@ -39,11 +38,23 @@ export async function POST(req: Request) {
     })
   }
 
-  const { id } = evt.data
   const eventType = evt.type
 
   if (eventType === 'user.created') {
-    console.log(`[WEBHOOK USER CREADO] El usuario con ID ${id} se acaba de registrar en Clerk. Aquí sincronizaríamos con la BBDD.`)
+    const { id, email_addresses, first_name, last_name } = evt.data
+    const email = email_addresses && email_addresses.length > 0 ? email_addresses[0].email_address : 'Sin correo'
+    
+    // Importación dinámica requerida al ser ruta de Edge o API
+    const { AddStudentHandler } = await import('@/application/command/AddStudentHandler')
+    const handler = new AddStudentHandler()
+    await handler.handle({
+        clerkId: id as string,
+        firstName: first_name as string | null,
+        lastName: last_name as string | null,
+        email: email
+    })
+    
+    console.log(`[WEBHOOK] Estudiante creado en la DB: ${first_name} ${last_name}`)
   }
 
   return new Response('', { status: 200 })
