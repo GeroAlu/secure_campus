@@ -14,22 +14,39 @@ type UserInfo = {
 export default function RolesPage() {
     const [users, setUsers] = useState<UserInfo[]>([])
     const [loading, setLoading] = useState(true)
+    const [editingUserId, setEditingUserId] = useState<string | null>(null);
+    const [selectedRoleForEdit, setSelectedRoleForEdit] = useState<string>('');
 
     const fetchUsers = async () => {
-        setLoading(true)
         const data = await getUsers()
         setUsers(data)
         setLoading(false)
     }
 
     useEffect(() => {
+        // eslint-disable-next-line
         fetchUsers()
     }, [])
 
-    const handleRoleChange = async (userId: string, currentRole: string, newRole: string) => {
-        if(currentRole === newRole) return;
+    const startEditing = (user: UserInfo) => {
+        setEditingUserId(user.id);
+        setSelectedRoleForEdit(user.role);
+    }
+
+    const cancelEditing = () => {
+        setEditingUserId(null);
+        setSelectedRoleForEdit('');
+    }
+
+    const saveRole = async (userId: string, currentRole: string) => {
+        if (selectedRoleForEdit === currentRole) {
+            cancelEditing();
+            return;
+        }
+        
         setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: 'Actualizando...' } : u))
-        await setRole(userId, newRole)
+        setEditingUserId(null);
+        await setRole(userId, selectedRoleForEdit)
         fetchUsers()
     }
 
@@ -56,7 +73,7 @@ export default function RolesPage() {
                     <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
                         {users.map((user) => (
                             <li key={user.id} className="p-4 sm:p-6 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-center justify-between flex-wrap gap-4">
                                     <div className="flex items-center gap-4">
                                         <div className="flex-shrink-0 h-10 w-10 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">
                                             <span className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
@@ -69,18 +86,45 @@ export default function RolesPage() {
                                         </div>
                                     </div>
                                     <div>
-                                        <select 
-                                            value={user.role}
-                                            onChange={(e) => handleRoleChange(user.id, user.role, e.target.value)}
-                                            disabled={user.role === 'Actualizando...'}
-                                            className="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 text-sm rounded-md border-r-8 border-transparent outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-500 cursor-pointer"
-                                        >
-                                            {user.role === 'Actualizando...' && <option value="Actualizando...">Actualizando...</option>}
-                                            <option value="Estudiante">Estudiante</option>
-                                            <option value="Auxiliar docente">Auxiliar docente</option>
-                                            <option value="Docente">Docente</option>
-                                            <option value="Administrador">Administrador</option>
-                                        </select>
+                                        {editingUserId === user.id ? (
+                                            <div className="flex gap-2 items-center">
+                                                <select 
+                                                    value={selectedRoleForEdit}
+                                                    onChange={(e) => setSelectedRoleForEdit(e.target.value)}
+                                                    className="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 text-sm rounded-md border-r-8 border-transparent outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-500 cursor-pointer text-zinc-900 dark:text-zinc-100"
+                                                >
+                                                    <option value="Estudiante">Estudiante</option>
+                                                    <option value="Auxiliar docente">Auxiliar docente</option>
+                                                    <option value="Docente">Docente</option>
+                                                    <option value="Administrador">Administrador</option>
+                                                </select>
+                                                <button 
+                                                    onClick={() => saveRole(user.id, user.role)}
+                                                    className="px-3 py-1.5 bg-zinc-900 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900 text-sm rounded-md hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors"
+                                                >
+                                                    Guardar
+                                                </button>
+                                                <button 
+                                                    onClick={cancelEditing}
+                                                    className="px-3 py-1.5 bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm rounded-md hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors"
+                                                >
+                                                    Cancelar
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="flex gap-4 items-center">
+                                                <span className="px-3 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-full text-xs font-medium border border-zinc-200 dark:border-zinc-700">
+                                                    {user.role}
+                                                </span>
+                                                <button 
+                                                    disabled={user.role === 'Actualizando...'}
+                                                    onClick={() => startEditing(user)}
+                                                    className="px-4 py-1.5 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-sm font-medium rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                                                >
+                                                    Editar rol
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </li>
