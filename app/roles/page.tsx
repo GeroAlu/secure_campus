@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { getUsers, setRole } from '../actions/roles'
 import { useUser } from '@clerk/nextjs'
+import { getPermissionsForRole } from '../utils/permissions'
 
 type UserInfo = {
     id: string;
@@ -14,7 +15,7 @@ type UserInfo = {
 }
 
 export default function RolesPage() {
-    const { user: currentUser } = useUser()
+    const { user: currentUser, isLoaded } = useUser()
     const [users, setUsers] = useState<UserInfo[]>([])
     const [loading, setLoading] = useState(true)
     const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -29,9 +30,17 @@ export default function RolesPage() {
     }
 
     useEffect(() => {
-        // eslint-disable-next-line
-        fetchUsers()
-    }, [])
+        const loadData = async () => {
+            if (isLoaded && currentUser) {
+                const role = currentUser.publicMetadata.role as string | undefined;
+                const perms = getPermissionsForRole(role);
+                if (perms.includes("manage:roles") || perms.includes("*")) {
+                    await fetchUsers();
+                }
+            }
+        };
+        loadData();
+    }, [isLoaded, currentUser])
 
     const startEditing = (user: UserInfo) => {
         setEditingUserId(user.id);
@@ -65,18 +74,40 @@ export default function RolesPage() {
 
     const isEditable = (targetUser: UserInfo) => {
         if (!currentUser) return false;
-        // Restricción 1: No editarse a sí mismo
+        // No editarse a sí mismo
         if (currentUser.id === targetUser.id) return false;
-        // Restricción 2: No editar a alguien que tenga manage:roles
+        // No editar a alguien que tenga rango mayor
         if (targetUser.permissions.includes("manage:roles") || targetUser.permissions.includes("*")) return false;
         
         return true;
     }
 
-    if (loading) {
+    const userRole = currentUser?.publicMetadata?.role as string | undefined;
+    const permissions = currentUser ? getPermissionsForRole(userRole) : [];
+    const canManageRoles = permissions.includes("manage:roles") || permissions.includes("*");
+
+    if (!isLoaded || (canManageRoles && loading)) {
         return (
             <main className="flex flex-1 items-center justify-center bg-zinc-50 dark:bg-zinc-950 h-full w-full">
                 <div className="w-8 h-8 rounded-full border-4 border-zinc-300 dark:border-zinc-700 border-t-zinc-900 dark:border-t-zinc-100 animate-spin" />
+            </main>
+        )
+    }
+
+    if (!canManageRoles) {
+        return (
+            <main className="flex flex-1 items-center justify-center bg-zinc-50 dark:bg-zinc-950 h-full w-full">
+                <div className="flex flex-col items-center justify-center max-w-md p-8 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm text-center">
+                    <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 flex items-center justify-center rounded-full mb-4">
+                        <svg className="w-8 h-8 text-red-600 dark:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                    </div>
+                    <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">Acceso Denegado</h2>
+                    <p className="text-zinc-500 dark:text-zinc-400">
+                        Solo los directivos o administradores pueden acceder a la gestión de roles de la institución.
+                    </p>
+                </div>
             </main>
         )
     }
