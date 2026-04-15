@@ -4,13 +4,15 @@ import { useEffect, useState } from "react"
 import { useStudents } from "@/app/hooks/useStudents"
 import { useStudentsStore, Student } from "@/app/store/students"
 import { useUser } from '@clerk/nextjs'
+import { getPermissionsForRole } from "../utils/permissions"
 
 export default function StudentsPage() {
   const { fetchStudents } = useStudents()
   const { students } = useStudentsStore()
   const [isLoading, setIsLoading] = useState(true)
   const { user } = useUser()
-  const role = user?.publicMetadata?.role as string | undefined || 'Estudiante'
+  const role = user?.publicMetadata?.role as string | null
+  const permissions = getPermissionsForRole(role)
 
   useEffect(() => {
     const loadStudents = async () => {
@@ -37,11 +39,6 @@ export default function StudentsPage() {
               Esta es la lista de estudiantes actualmente en el sistema.
             </p>
           </div>
-          {(role === 'Docente' || role === 'Administrador') && (
-            <button className="px-4 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-md hover:bg-zinc-800 dark:hover:bg-zinc-200 text-sm font-medium transition-colors">
-              + Agregar
-            </button>
-          )}
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -69,8 +66,8 @@ export default function StudentsPage() {
                         {student.email && <p className="text-sm text-zinc-500 dark:text-zinc-400">{student.email}</p>}
                       </div>
                     </div>
-                    {role === 'Docente' && (
-                       <button className="text-xs text-red-600 hover:text-red-700 hover:underline">Eliminar</button>
+                    {permissions.includes('deactivate:students') && (
+                       <button className="text-xs text-red-600 hover:text-red-700 hover:underline">Dar de baja</button>
                     )}
                   </div>
                 </li>

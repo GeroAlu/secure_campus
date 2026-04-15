@@ -1,43 +1,69 @@
 'use server'
 
 import { auth, clerkClient } from '@clerk/nextjs/server'
+import { getPermissionsForRole } from '../utils/permissions'
 
-async function checkIsAdmin() {
+export async function hasPermission(requiredPermission: string) {
     const { userId } = await auth()
     if (!userId) return false
     
     const client = await clerkClient()
     const user = await client.users.getUser(userId)
-    return user.publicMetadata?.role === 'Administrador'
+    
+    const role = user.publicMetadata?.role as string | null
+    const userPermissions = getPermissionsForRole(role)
+    
+    return userPermissions.includes(requiredPermission) || userPermissions.includes('*')
 }
 
 export async function getUsers() {
     try {
-        const isAdmin = await checkIsAdmin()
-        if (!isAdmin) throw new Error("Unauthorized")
+        const canManageRoles = await hasPermission('manage:roles')
+        if (!canManageRoles) throw new Error("Unauthorized")
 
         const client = await clerkClient()
         const users = await client.users.getUserList({ limit: 100 })
-        return users.data.map(user => ({
-            id: user.id,
-            email: user.emailAddresses[0]?.emailAddress || 'Sin email',
-            firstName: user.firstName,
-            lastName: user.lastName,
-            role: user.publicMetadata.role as string || 'Estudiante',
-        }))
+        
+        return users.data.map(user => {
+            const role = (user.publicMetadata.role as string) || 'Estudiante'
+            return {
+                id: user.id,
+                email: user.emailAddresses[0]?.emailAddress || 'Sin email',
+                firstName: user.firstName,
+                lastName: user.lastName,
+                role: role,
+                permissions: getPermissionsForRole(role)
+            }
+        })
     } catch (e) {
         console.error('Error fetching users:', e)
         return []
     }
 }
 
-export async function setRole(userId: string, targetRole: string) {
+export async function setRole(targetUserId: string, targetRole: string) {
     try {
-        const isAdmin = await checkIsAdmin()
-        if (!isAdmin) throw new Error("Unauthorized")
+        const { userId: myId } = await auth()
+        if (!myId) throw new Error("Unauthenticated")
+
+        // 1. Verificación universal: no puedes editarte a ti mismo
+        if (myId === targetUserId) throw new Error("Cannot edit yourself")
+
+        const canManageRoles = await hasPermission('manage:roles')
+        if (!canManageRoles) throw new Error("Unauthorized")
 
         const client = await clerkClient()
-        await client.users.updateUserMetadata(userId, {
+        
+        // 2. Verificación PBAC: ¿El objetivo ya es un administrador?
+        const targetUser = await client.users.getUser(targetUserId)
+        const targetCurrentRole = targetUser.publicMetadata?.role as string | null
+        const targetCurrentPermissions = getPermissionsForRole(targetCurrentRole)
+        
+        if (targetCurrentPermissions.includes('manage:roles') || targetCurrentPermissions.includes('*')) {
+            throw new Error("Cannot modify a user who possesses the manage:roles permission")
+        }
+
+        await client.users.updateUserMetadata(targetUserId, {
             publicMetadata: {
                 role: targetRole
             }

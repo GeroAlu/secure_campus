@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GetStudentsListHandler, GetStudentsListQuery } from '@/application/query/GetStudentsListHandler'
+import { getPermissionsForRole } from '@/app/utils/permissions'
 import { auth } from '@clerk/nextjs/server'
 
 const getStudentsListQueryHandler = async (request: NextRequest): Promise<NextResponse> => {
@@ -9,15 +10,16 @@ const getStudentsListQueryHandler = async (request: NextRequest): Promise<NextRe
             return NextResponse.json({ error: "No autenticado" }, { status: 401 })
         }
 
-        const role = (sessionClaims.sessionClaims?.publicMetadata as any)?.role as string | undefined || 'Estudiante'
+        const role = (sessionClaims.sessionClaims?.publicMetadata as any)?.role as string | null
+        const permissions = getPermissionsForRole(role)
 
         const handler = new GetStudentsListHandler()
         
         const query: GetStudentsListQuery = {}
         const response = await handler.handle(query)
 
-        // Si el rol es Estudiante, ofuscar u ocultar emails y otros datos sensibles
-        if (role === 'Estudiante') {
+        // Si no tiene permiso de ver detalles, ofuscar u ocultar emails
+        if (!permissions.includes('view:student_details') && !permissions.includes('*')) {
             response.list = response.list.map(student => ({
                 ...student,
                 email: '' // Ocultamos el mail

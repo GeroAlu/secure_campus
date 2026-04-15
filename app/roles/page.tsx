@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { getUsers, setRole } from '../actions/roles'
+import { useUser } from '@clerk/nextjs'
 
 type UserInfo = {
     id: string;
@@ -9,17 +10,21 @@ type UserInfo = {
     firstName: string | null;
     lastName: string | null;
     role: string;
+    permissions: string[];
 }
 
 export default function RolesPage() {
+    const { user: currentUser } = useUser()
     const [users, setUsers] = useState<UserInfo[]>([])
     const [loading, setLoading] = useState(true)
     const [editingUserId, setEditingUserId] = useState<string | null>(null);
     const [selectedRoleForEdit, setSelectedRoleForEdit] = useState<string>('');
+    const [updatingId, setUpdatingId] = useState<string | null>(null);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     const fetchUsers = async () => {
         const data = await getUsers()
-        setUsers(data)
+        setUsers(data as UserInfo[])
         setLoading(false)
     }
 
@@ -36,18 +41,36 @@ export default function RolesPage() {
     const cancelEditing = () => {
         setEditingUserId(null);
         setSelectedRoleForEdit('');
+        setErrorMsg(null);
     }
 
-    const saveRole = async (userId: string, currentRole: string) => {
+    const saveRoleAction = async (userId: string, currentRole: string) => {
         if (selectedRoleForEdit === currentRole) {
             cancelEditing();
             return;
         }
         
-        setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: 'Actualizando...' } : u))
+        setUpdatingId(userId);
         setEditingUserId(null);
-        await setRole(userId, selectedRoleForEdit)
-        fetchUsers()
+        setErrorMsg(null);
+        
+        const result = await setRole(userId, selectedRoleForEdit)
+        if (!result.success) {
+            setErrorMsg("No tienes permisos para modificar a este usuario.");
+        }
+        
+        await fetchUsers()
+        setUpdatingId(null);
+    }
+
+    const isEditable = (targetUser: UserInfo) => {
+        if (!currentUser) return false;
+        // Restricción 1: No editarse a sí mismo
+        if (currentUser.id === targetUser.id) return false;
+        // Restricción 2: No editar a alguien que tenga manage:roles
+        if (targetUser.permissions.includes("manage:roles") || targetUser.permissions.includes("*")) return false;
+        
+        return true;
     }
 
     if (loading) {
@@ -66,8 +89,13 @@ export default function RolesPage() {
                         Gestión de Roles
                     </h2>
                     <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-                        Desde aquí puedes modificar los niveles de acceso de todos los usuarios registrados en Clerk.
+                        Asigna roles predefinidos a los usuarios. Los permisos se adaptarán automáticamente.
                     </p>
+                    {errorMsg && (
+                        <div className="mt-4 p-3 bg-red-100 border border-red-200 text-red-600 rounded">
+                            {errorMsg}
+                        </div>
+                    )}
                 </div>
                 <div className="flex-1 overflow-y-auto">
                     <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -99,7 +127,7 @@ export default function RolesPage() {
                                                     <option value="Administrador">Administrador</option>
                                                 </select>
                                                 <button 
-                                                    onClick={() => saveRole(user.id, user.role)}
+                                                    onClick={() => saveRoleAction(user.id, user.role)}
                                                     className="px-3 py-1.5 bg-zinc-900 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900 text-sm rounded-md hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors"
                                                 >
                                                     Guardar
@@ -116,13 +144,17 @@ export default function RolesPage() {
                                                 <span className="px-3 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-full text-xs font-medium border border-zinc-200 dark:border-zinc-700">
                                                     {user.role}
                                                 </span>
-                                                <button 
-                                                    disabled={user.role === 'Actualizando...'}
-                                                    onClick={() => startEditing(user)}
-                                                    className="px-4 py-1.5 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-sm font-medium rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
-                                                >
-                                                    Editar rol
-                                                </button>
+                                                {isEditable(user) ? (
+                                                    <button 
+                                                        disabled={updatingId === user.id}
+                                                        onClick={() => startEditing(user)}
+                                                        className="px-4 py-1.5 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-sm font-medium rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                                                    >
+                                                        {updatingId === user.id ? 'Actualizando...' : 'Editar rol'}
+                                                    </button>
+                                                ) : (
+                                                    <span className="px-4 py-1.5 text-zinc-400 text-sm italic">Protegido</span>
+                                                )}
                                             </div>
                                         )}
                                     </div>

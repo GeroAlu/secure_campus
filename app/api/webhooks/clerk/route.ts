@@ -43,18 +43,27 @@ export async function POST(req: Request) {
   if (eventType === 'user.created') {
     const { id, email_addresses, first_name, last_name } = evt.data
     const email = email_addresses && email_addresses.length > 0 ? email_addresses[0].email_address : 'Sin correo'
-    
+
+    // Asignar el rol por defecto en la BD de Clerk
+    const { clerkClient } = await import('@clerk/nextjs/server')
+    const client = await clerkClient()
+    await client.users.updateUserMetadata(id as string, {
+      publicMetadata: {
+        role: 'Estudiante' // Asignación explícita
+      }
+    })
+
     // Importación dinámica requerida al ser ruta de Edge o API
     const { AddStudentHandler } = await import('@/application/command/AddStudentHandler')
     const handler = new AddStudentHandler()
     await handler.handle({
-        clerkId: id as string,
-        firstName: first_name as string | null,
-        lastName: last_name as string | null,
-        email: email
+      clerkId: id as string,
+      firstName: first_name as string | null,
+      lastName: last_name as string | null,
+      email: email
     })
-    
-    console.log(`[WEBHOOK] Estudiante creado en la DB: ${first_name} ${last_name}`)
+
+    console.log(`[WEBHOOK] Estudiante creado en la DB Local y Clerk: ${first_name} ${last_name}`)
   }
 
   return new Response('', { status: 200 })
