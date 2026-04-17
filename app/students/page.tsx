@@ -8,7 +8,7 @@ import { getPermissionsForRole } from "../utils/permissions"
 
 export default function StudentsPage() {
   const { fetchStudents } = useStudents()
-  const { students } = useStudentsStore()
+  const { students, currentPage, totalPages, totalItems } = useStudentsStore()
   const [isLoading, setIsLoading] = useState(true)
   const { user } = useUser()
   const role = user?.publicMetadata?.role as string | null
@@ -16,8 +16,9 @@ export default function StudentsPage() {
 
   useEffect(() => {
     const loadStudents = async () => {
+      setIsLoading(true)
       try {
-        await fetchStudents()
+        await fetchStudents(1)
       } catch (error) {
         console.error("Error fetching students:", error)
       } finally {
@@ -26,6 +27,18 @@ export default function StudentsPage() {
     }
     loadStudents()
   }, [fetchStudents])
+
+  const handlePageChange = async (newPage: number) => {
+      if(newPage < 1 || newPage > totalPages) return;
+      setIsLoading(true);
+      try {
+          await fetchStudents(newPage);
+      } catch (error) {
+          console.error("Error fetching students:", error);
+      } finally {
+          setIsLoading(false);
+      }
+  }
 
   return (
     <main className="flex flex-col flex-1 items-center bg-zinc-50 font-sans dark:bg-zinc-950 h-full w-full overflow-hidden">
@@ -36,7 +49,7 @@ export default function StudentsPage() {
               Listado de Estudiantes
             </h2>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-              Esta es la lista de estudiantes actualmente en el sistema.
+              Esta es la lista de estudiantes actualmente en el sistema. Total: {totalItems > 0 ? totalItems : '-'}
             </p>
           </div>
         </div>
@@ -55,24 +68,49 @@ export default function StudentsPage() {
               No se encontraron estudiantes.
             </div>
           ) : (
-            <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
-              {students.map((student: Student) => (
-                <li key={student.id} className="p-4 sm:p-6 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="flex-shrink-0 h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center"><span className="text-lg font-medium text-zinc-600 dark:text-zinc-300">{student.name.charAt(0).toUpperCase()}</span></div>
-                      <div>
-                        <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{student.name}</p>
-                        {student.email && <p className="text-sm text-zinc-500 dark:text-zinc-400">{student.email}</p>}
+            <div className="flex flex-col justify-between h-full">
+              <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                {students.map((student: Student) => (
+                  <li key={student.id} className="p-4 sm:p-6 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="flex-shrink-0 h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center"><span className="text-lg font-medium text-zinc-600 dark:text-zinc-300">{student.name.charAt(0).toUpperCase()}</span></div>
+                        <div>
+                          <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{student.name}</p>
+                          {student.email && <p className="text-sm text-zinc-500 dark:text-zinc-400">{student.email}</p>}
+                        </div>
                       </div>
+                      {permissions.includes('deactivate:students') && (
+                         <button className="text-xs text-red-600 hover:text-red-700 hover:underline">Dar de baja</button>
+                      )}
                     </div>
-                    {permissions.includes('deactivate:students') && (
-                       <button className="text-xs text-red-600 hover:text-red-700 hover:underline">Dar de baja</button>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
+                  </li>
+                ))}
+              </ul>
+              
+              {/* Pagination controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between px-6 py-4 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 mt-auto">
+                    <button 
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className="px-4 py-2 border border-zinc-300 dark:border-zinc-700 rounded-md text-sm font-medium text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        Anterior
+                    </button>
+                    <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                        Página <span className="font-medium text-zinc-900 dark:text-zinc-100">{currentPage}</span> de <span className="font-medium text-zinc-900 dark:text-zinc-100">{totalPages}</span>
+                    </span>
+                    <button 
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        className="px-4 py-2 border border-zinc-300 dark:border-zinc-700 rounded-md text-sm font-medium text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        Siguiente
+                    </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>

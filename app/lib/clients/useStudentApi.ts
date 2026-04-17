@@ -8,8 +8,8 @@ const BASE_URL = '/api/student/list'
 import { useCallback } from 'react'
 
 export const useStudentApi = () => {
-    const getStudentsList = useCallback(async (): Promise<GetStudentsListResponse> => {
-        return api.get<GetStudentsListResponse>(BASE_URL)
+    const getStudentsList = useCallback(async (page: number = 1): Promise<GetStudentsListResponse> => {
+        return api.get<GetStudentsListResponse>(`${BASE_URL}?page=${page}`)
     }, [])
 
     return {

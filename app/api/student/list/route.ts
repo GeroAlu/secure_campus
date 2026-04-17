@@ -1,21 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GetStudentsListHandler, GetStudentsListQuery } from '@/application/query/GetStudentsListHandler'
 import { getPermissionsForRole } from '@/app/utils/permissions'
-import { auth } from '@clerk/nextjs/server'
+import { auth, clerkClient } from '@clerk/nextjs/server'
 
 const getStudentsListQueryHandler = async (request: NextRequest): Promise<NextResponse> => {
     try {
-        const sessionClaims = await auth()
-        if (!sessionClaims.userId) {
+        const { userId } = await auth()
+        if (!userId) {
             return NextResponse.json({ error: "No autenticado" }, { status: 401 })
         }
 
-        const role = (sessionClaims.sessionClaims?.publicMetadata as any)?.role as string | null
+        const client = await clerkClient()
+        const user = await client.users.getUser(userId)
+        const role = user.publicMetadata?.role as string | null
         const permissions = getPermissionsForRole(role)
 
         const handler = new GetStudentsListHandler()
         
-        const query: GetStudentsListQuery = {}
+        const url = new URL(request.url)
+        const pageParam = url.searchParams.get('page')
+        const page = pageParam ? parseInt(pageParam, 10) : 1
+        
+        const query: GetStudentsListQuery = { page }
         const response = await handler.handle(query)
 
         // Si no tiene permiso de ver detalles, ofuscar u ocultar emails

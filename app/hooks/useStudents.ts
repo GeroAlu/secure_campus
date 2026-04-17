@@ -4,13 +4,16 @@ import { useStudentApi } from '@/app/lib/clients/useStudentApi'
 
 export const useStudents = () => {
   
-    const { setStudents } = useStudentsStore()
+    const { setStudents, setPagination } = useStudentsStore()
     const { getStudentsList } = useStudentApi()
 
-    const fetchStudents = useCallback(async () => {
-        const response = await getStudentsList()
+    const fetchStudents = useCallback(async (page: number = 1) => {
+        const response = await getStudentsList(page)
         setStudents(response.list)
-    }, [getStudentsList, setStudents])
+        if (response.totalPages) {
+            setPagination(response.currentPage, response.totalPages, response.totalItems)
+        }
+    }, [getStudentsList, setStudents, setPagination])
 
     return {
         fetchStudents,

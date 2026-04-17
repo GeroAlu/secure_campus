@@ -1,44 +1,60 @@
-export const HARDCODED_LIST = [
-    { id: 1, name: 'Juan Pérez', email: 'juan.perez@example.com', active: true },
-    { id: 2, name: 'María Gómez', email: 'maria.gomez@example.com', active: true },
-    { id: 3, name: 'Carlos López', email: 'carlos.lopez@example.com', active: true },
-    { id: 4, name: 'Ana Martínez', email: 'ana.martinez@example.com', active: true },
-    { id: 5, name: 'Luis Fernández', email: 'luis.fernandez@example.com', active: true },
-    { id: 6, name: 'Sofía Ramírez', email: 'sofia.ramirez@example.com', active: true },
-    { id: 7, name: 'Diego Torres', email: 'diego.torres@example.com', active: true },
-    { id: 8, name: 'Valentina Ruiz', email: 'valentina.ruiz@example.com', active: true },
-    { id: 9, name: 'Pedro Sánchez', email: 'pedro.sanchez@example.com', active: true },
-    { id: 10, name: 'Lucía Herrera', email: 'lucia.herrera@example.com', active: true },
-    { id: 11, name: 'Miguel Castro', email: 'miguel.castro@example.com', active: true },
-    { id: 12, name: 'Camila Ortiz', email: 'camila.ortiz@example.com', active: true },
-    { id: 13, name: 'Jorge Díaz', email: 'jorge.diaz@example.com', active: true },
-    { id: 14, name: 'Paula Morales', email: 'paula.morales@example.com', active: true },
-    { id: 15, name: 'Andrés Vega', email: 'andres.vega@example.com', active: true },
-];
+import { clerkClient } from '@clerk/nextjs/server'
 
 export class GetStudentsListHandler {
 
     async handle(command: GetStudentsListQuery): Promise<GetStudentsListResponse> {
-        const response = HARDCODED_LIST.map(student => ({
-            id: student.id,
-            name: student.name,
-            email: student.email,
-            active: student.active,
-        }))
+        const client = await clerkClient();
+        
+        let students: Student[] = [];
+        try {
+            const usersReq = await client.users.getUserList({ limit: 500 });
+            students = usersReq.data.filter(user => {
+                const role = user.publicMetadata?.role as string | undefined;
+                return !role || role === 'Estudiante' || role === 'Alumno';
+            }).map(user => ({
+                id: user.id || '',
+                name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Sin Nombre',
+                email: user.emailAddresses[0]?.emailAddress || '',
+                active: true,
+            }));
+        } catch (e) {
+            console.error("Error fetching users from clerk", e);
+        }
 
-        return { list: response }
+        const page = command.page || 1;
+        const limit = command.limit || 10;
+        
+        const totalItems = students.length;
+        const totalPages = Math.max(1, Math.ceil(totalItems / limit));
+        
+        const startIndex = (page - 1) * limit;
+        const endIndex = startIndex + limit;
+        
+        const paginatedList = students.slice(startIndex, endIndex);
+
+        return { 
+            list: paginatedList, 
+            totalPages, 
+            currentPage: page,
+            totalItems
+        }
     }
 }
 
 export interface GetStudentsListQuery {
+    page?: number;
+    limit?: number;
 }
 
 export interface GetStudentsListResponse {
-    list: Student[]
+    list: Student[];
+    totalPages: number;
+    currentPage: number;
+    totalItems: number;
 }
 
 export interface Student {
-    id: number
+    id: string
     name: string
     email: string
     active: boolean
