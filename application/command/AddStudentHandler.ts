@@ -1,16 +1,8 @@
-import { HARDCODED_LIST } from "../query/GetStudentsListHandler"
-
 export class AddStudentHandler {
     async handle(command: AddStudentCommand): Promise<void> {
-        // Guardamos en la variable en memoria.
-        const newId = HARDCODED_LIST.length > 0 ? Math.max(...HARDCODED_LIST.map((s: { id: number }) => s.id)) + 1 : 1;
-        
-        HARDCODED_LIST.push({
-            id: newId,
-            name: `${command.firstName || ''} ${command.lastName || ''}`.trim() || 'Nuevo Estudiante',
-            email: command.email,
-            active: true
-        })
+        // En esta versión, los estudiantes se obtienen directamente de Clerk
+        // por lo que no es necesario guardar en una lista en memoria o base de datos local aún.
+        // Se mantiene el handler por si en el futuro se desea persistir en Prisma u otra BD.
     }
 }
 
