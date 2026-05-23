@@ -1,39 +1,45 @@
-import { clerkClient } from '@clerk/nextjs/server'
+import pool from '../../lib/db';
 
 export class GetStudentsListHandler {
 
     async handle(command: GetStudentsListQuery): Promise<GetStudentsListResponse> {
-        const client = await clerkClient();
-        
         let students: Student[] = [];
-        try {
-            const usersReq = await client.users.getUserList({ limit: 500 });
-            students = usersReq.data.filter(user => {
-                const role = user.publicMetadata?.role as string | undefined;
-                return !role || role === 'Estudiante' || role === 'Alumno';
-            }).map(user => ({
-                id: user.id || '',
-                name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Sin Nombre',
-                email: user.emailAddresses[0]?.emailAddress || '',
-                active: true,
-            }));
-        } catch (e) {
-            console.error("Error fetching users from clerk", e);
-        }
-
+        let totalItems = 0;
+        
         const page = command.page || 1;
         const limit = command.limit || 10;
-        
-        const totalItems = students.length;
+        const offset = (page - 1) * limit;
+
+        try {
+            // Count total students (Estudiante or Alumno)
+            const countResult = await pool.query(
+                `SELECT COUNT(*) FROM public.users WHERE role IN ('Estudiante', 'Alumno', 'estudiante', 'alumno')`
+            );
+            totalItems = parseInt(countResult.rows[0].count, 10);
+
+            // Fetch paginated students
+            const usersResult = await pool.query(
+                `SELECT * FROM public.users 
+                 WHERE role IN ('Estudiante', 'Alumno', 'estudiante', 'alumno')
+                 ORDER BY created_at DESC
+                 LIMIT $1 OFFSET $2`,
+                [limit, offset]
+            );
+
+            students = usersResult.rows.map((row: any) => ({
+                id: row.clerk_id || row.id, // Fallback to uuid if no clerk_id
+                name: `${row.first_name || ''} ${row.last_name || ''}`.trim() || 'Sin Nombre',
+                email: row.email || '',
+                active: row.active,
+            }));
+        } catch (e) {
+            console.error("Error fetching users from Supabase", e);
+        }
+
         const totalPages = Math.max(1, Math.ceil(totalItems / limit));
-        
-        const startIndex = (page - 1) * limit;
-        const endIndex = startIndex + limit;
-        
-        const paginatedList = students.slice(startIndex, endIndex);
 
         return { 
-            list: paginatedList, 
+            list: students, 
             totalPages, 
             currentPage: page,
             totalItems
