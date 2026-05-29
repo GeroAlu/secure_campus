@@ -14,7 +14,23 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Deshabilitar clones rápidos para mejor análisis de historial
-          
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
+        env:
+          GROQ_API_KEY: 'dummy-key'
+          ENCRYPTION_KEY: 'dummy-encryption-key-that-is-32-chars-long'
+          DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/postgres'
+
       - name: SonarCloud Scan
         uses: SonarSource/sonarqube-scan-action@299e4b793aaa83bf2aba7c9c14bedbb485688ec4 # v7.1.0
         env:
