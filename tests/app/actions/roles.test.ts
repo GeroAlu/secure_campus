@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { hasPermission, getUsers, setRole } from '../../../app/actions/roles';
 import { auth } from '@clerk/nextjs/server';
+import pool from '../../../lib/db';
 
 const mockGetUser = vi.fn();
 const mockGetUserList = vi.fn();
@@ -20,6 +21,15 @@ vi.mock('@clerk/nextjs/server', () => {
   };
 });
 
+vi.mock('../../../lib/db', () => {
+  return {
+    default: {
+      query: vi.fn(),
+    },
+    getEncryptionKey: vi.fn(() => 'mock-encryption-key'),
+  };
+});
+
 describe('roles actions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -34,21 +44,20 @@ describe('roles actions', () => {
 
     it('should return true if the user has the exact permission', async () => {
       vi.mocked(auth).mockResolvedValue({ userId: 'user_docente' } as unknown as Awaited<ReturnType<typeof auth>>);
-      mockGetUser.mockResolvedValue({
-        id: 'user_docente',
-        publicMetadata: { role: 'Docente' },
+      (vi.mocked(pool.query) as Mock).mockResolvedValue({
+        rowCount: 1,
+        rows: [{ role: 'Docente' }],
       });
 
       const result = await hasPermission('deactivate:students');
       expect(result).toBe(true);
-      expect(mockGetUser).toHaveBeenCalledWith('user_docente');
     });
 
     it('should return true if the user has wildcard "*" permission', async () => {
       vi.mocked(auth).mockResolvedValue({ userId: 'user_admin' } as unknown as Awaited<ReturnType<typeof auth>>);
-      mockGetUser.mockResolvedValue({
-        id: 'user_admin',
-        publicMetadata: { role: 'Administrador' },
+      (vi.mocked(pool.query) as Mock).mockResolvedValue({
+        rowCount: 1,
+        rows: [{ role: 'Administrador' }],
       });
 
       const result = await hasPermission('any:custom_permission');
@@ -57,9 +66,9 @@ describe('roles actions', () => {
 
     it('should return false if the user does not have the permission', async () => {
       vi.mocked(auth).mockResolvedValue({ userId: 'user_estudiante' } as unknown as Awaited<ReturnType<typeof auth>>);
-      mockGetUser.mockResolvedValue({
-        id: 'user_estudiante',
-        publicMetadata: { role: 'Estudiante' },
+      (vi.mocked(pool.query) as Mock).mockResolvedValue({
+        rowCount: 1,
+        rows: [{ role: 'Estudiante' }],
       });
 
       const result = await hasPermission('view:student_details');
@@ -70,9 +79,9 @@ describe('roles actions', () => {
   describe('getUsers', () => {
     it('should fail with Unauthorized error if user lacks manage:roles', async () => {
       vi.mocked(auth).mockResolvedValue({ userId: 'user_docente' } as unknown as Awaited<ReturnType<typeof auth>>);
-      mockGetUser.mockResolvedValue({
-        id: 'user_docente',
-        publicMetadata: { role: 'Docente' }, // lacks manage:roles
+      (vi.mocked(pool.query) as Mock).mockResolvedValue({
+        rowCount: 1,
+        rows: [{ role: 'Docente' }],
       });
 
       const users = await getUsers();
@@ -81,29 +90,19 @@ describe('roles actions', () => {
 
     it('should fetch users list if user is an Administrator', async () => {
       vi.mocked(auth).mockResolvedValue({ userId: 'user_admin' } as unknown as Awaited<ReturnType<typeof auth>>);
-      mockGetUser.mockResolvedValue({
-        id: 'user_admin',
-        publicMetadata: { role: 'Administrador' },
-      });
-
-      mockGetUserList.mockResolvedValue({
-        data: [
-          {
-            id: 'u1',
-            firstName: 'John',
-            lastName: 'Doe',
-            emailAddresses: [{ emailAddress: 'john@example.com' }],
-            publicMetadata: { role: 'Estudiante' },
-          },
-          {
-            id: 'u2',
-            firstName: 'Jane',
-            lastName: 'Smith',
-            emailAddresses: [],
-            publicMetadata: {}, // defaults to Estudiante
-          },
-        ],
-      });
+      
+      (vi.mocked(pool.query) as Mock)
+        .mockResolvedValueOnce({
+          rowCount: 1,
+          rows: [{ role: 'Administrador' }],
+        })
+        .mockResolvedValueOnce({
+          rowCount: 2,
+          rows: [
+            { clerk_id: 'u1', first_name: 'John', last_name: 'Doe', email: 'john@example.com', role: 'Estudiante' },
+            { clerk_id: 'u2', first_name: 'Jane', last_name: 'Smith', email: null, role: 'Estudiante' },
+          ],
+        });
 
       const users = await getUsers();
       expect(users).toHaveLength(2);
@@ -119,13 +118,15 @@ describe('roles actions', () => {
       expect(users[1].role).toBe('Estudiante');
     });
 
-    it('should return empty list on Clerk API error', async () => {
+    it('should return empty list on DB query error', async () => {
       vi.mocked(auth).mockResolvedValue({ userId: 'user_admin' } as unknown as Awaited<ReturnType<typeof auth>>);
-      mockGetUser.mockResolvedValue({
-        id: 'user_admin',
-        publicMetadata: { role: 'Administrador' },
-      });
-      mockGetUserList.mockRejectedValue(new Error('Clerk error'));
+      
+      (vi.mocked(pool.query) as Mock)
+        .mockResolvedValueOnce({
+          rowCount: 1,
+          rows: [{ role: 'Administrador' }],
+        })
+        .mockRejectedValueOnce(new Error('Database select error'));
 
       const users = await getUsers();
       expect(users).toEqual([]);
@@ -146,9 +147,10 @@ describe('roles actions', () => {
 
     it('should prevent setting role if not authorized', async () => {
       vi.mocked(auth).mockResolvedValue({ userId: 'user_docente' } as unknown as Awaited<ReturnType<typeof auth>>);
-      mockGetUser.mockResolvedValueOnce({
-        id: 'user_docente',
-        publicMetadata: { role: 'Docente' },
+      
+      (vi.mocked(pool.query) as Mock).mockResolvedValue({
+        rowCount: 1,
+        rows: [{ role: 'Docente' }],
       });
 
       const res = await setRole('target_user', 'Administrador');
@@ -159,16 +161,15 @@ describe('roles actions', () => {
     it('should prevent modifying another administrator (manage:roles target)', async () => {
       vi.mocked(auth).mockResolvedValue({ userId: 'user_admin_1' } as unknown as Awaited<ReturnType<typeof auth>>);
       
-      // first call in hasPermission (for user_admin_1)
-      mockGetUser.mockResolvedValueOnce({
-        id: 'user_admin_1',
-        publicMetadata: { role: 'Administrador' },
-      });
-      // second call in setRole (for target user which is also an admin)
-      mockGetUser.mockResolvedValueOnce({
-        id: 'user_admin_2',
-        publicMetadata: { role: 'Administrador' },
-      });
+      (vi.mocked(pool.query) as Mock)
+        .mockResolvedValueOnce({
+          rowCount: 1,
+          rows: [{ role: 'Administrador' }],
+        })
+        .mockResolvedValueOnce({
+          rowCount: 1,
+          rows: [{ role: 'Administrador' }],
+        });
 
       const res = await setRole('user_admin_2', 'Estudiante');
       expect(res.success).toBe(false);
@@ -178,16 +179,18 @@ describe('roles actions', () => {
     it('should successfully update role of a lower role user', async () => {
       vi.mocked(auth).mockResolvedValue({ userId: 'user_admin' } as unknown as Awaited<ReturnType<typeof auth>>);
       
-      // mock for hasPermission
-      mockGetUser.mockResolvedValueOnce({
-        id: 'user_admin',
-        publicMetadata: { role: 'Administrador' },
-      });
-      // mock for target user
-      mockGetUser.mockResolvedValueOnce({
-        id: 'user_student',
-        publicMetadata: { role: 'Estudiante' },
-      });
+      (vi.mocked(pool.query) as Mock)
+        .mockResolvedValueOnce({
+          rowCount: 1,
+          rows: [{ role: 'Administrador' }],
+        })
+        .mockResolvedValueOnce({
+          rowCount: 1,
+          rows: [{ role: 'Estudiante' }],
+        })
+        .mockResolvedValueOnce({
+          rowCount: 1,
+        });
 
       mockUpdateUserMetadata.mockResolvedValue({});
 

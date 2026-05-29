@@ -3,15 +3,21 @@
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { getPermissionsForRole } from '../utils/permissions'
 import { roleActionSchema } from '../../lib/validation'
+import pool, { getEncryptionKey } from '../../lib/db'
 
 export async function hasPermission(requiredPermission: string) {
     const { userId } = await auth()
     if (!userId) return false
     
-    const client = await clerkClient()
-    const user = await client.users.getUser(userId)
+    const dbUserRes = await pool.query(
+      'SELECT role FROM public.users WHERE clerk_id_hash = encode(digest($1::text, \'sha256\'), \'hex\')',
+      [userId]
+    )
+    if (dbUserRes.rowCount === null || dbUserRes.rowCount === 0) {
+      return false
+    }
     
-    const role = user.publicMetadata?.role as string | null
+    const role = dbUserRes.rows[0].role
     const userPermissions = getPermissionsForRole(role)
     
     return userPermissions.includes(requiredPermission) || userPermissions.includes('*')
@@ -22,16 +28,26 @@ export async function getUsers() {
         const canManageRoles = await hasPermission('manage:roles')
         if (!canManageRoles) throw new Error("Unauthorized")
 
-        const client = await clerkClient()
-        const users = await client.users.getUserList({ limit: 100 })
+        const key = getEncryptionKey()
+        const usersResult = await pool.query(
+            `SELECT 
+                pgp_sym_decrypt(clerk_id, $1::text)::text AS clerk_id,
+                first_name,
+                last_name,
+                pgp_sym_decrypt(email, $1::text)::text AS email,
+                role
+             FROM public.users
+             ORDER BY created_at DESC`,
+            [key]
+        )
         
-        return users.data.map(user => {
-            const role = (user.publicMetadata.role as string) || 'Estudiante'
+        return usersResult.rows.map(row => {
+            const role = row.role || 'Estudiante'
             return {
-                id: user.id,
-                email: user.emailAddresses[0]?.emailAddress || 'Sin email',
-                firstName: user.firstName,
-                lastName: user.lastName,
+                id: row.clerk_id || '',
+                email: row.email || 'Sin email',
+                firstName: row.first_name,
+                lastName: row.last_name,
                 role: role,
                 permissions: getPermissionsForRole(role)
             }
@@ -59,13 +75,24 @@ export async function setRole(targetUserId: string, targetRole: string) {
 
         const client = await clerkClient()
         
-        const targetUser = await client.users.getUser(parsed.data.targetUserId)
-        const targetCurrentRole = targetUser.publicMetadata?.role as string | null
-        const targetCurrentPermissions = getPermissionsForRole(targetCurrentRole)
+        const targetUserRes = await pool.query(
+            `SELECT role FROM public.users WHERE clerk_id_hash = encode(digest($1::text, 'sha256\'), \'hex\')`,
+            [parsed.data.targetUserId]
+        )
         
-        if (targetCurrentPermissions.includes('manage:roles') || targetCurrentPermissions.includes('*')) {
-            throw new Error("Cannot modify a user who possesses the manage:roles permission")
+        if (targetUserRes.rowCount !== null && targetUserRes.rowCount > 0) {
+            const targetCurrentRole = targetUserRes.rows[0].role
+            const targetCurrentPermissions = getPermissionsForRole(targetCurrentRole)
+            
+            if (targetCurrentPermissions.includes('manage:roles') || targetCurrentPermissions.includes('*')) {
+                throw new Error("Cannot modify a user who possesses the manage:roles permission")
+            }
         }
+
+        await pool.query(
+            `UPDATE public.users SET role = $1 WHERE clerk_id_hash = encode(digest($2::text, 'sha256\'), \'hex\')`,
+            [parsed.data.targetRole, parsed.data.targetUserId]
+        )
 
         await client.users.updateUserMetadata(parsed.data.targetUserId, {
             publicMetadata: {

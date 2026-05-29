@@ -26,7 +26,7 @@ export class GetStudentsListHandler {
 
         try {
             const countResult = await pool.query(
-                `SELECT COUNT(*) FROM public.users WHERE role IN ('Estudiante', 'Alumno', 'estudiante', 'alumno')`
+                `SELECT COUNT(*) FROM public.users WHERE role = 'Estudiante'`
             );
             totalItems = parseInt(countResult.rows[0].count, 10);
 
@@ -38,7 +38,7 @@ export class GetStudentsListHandler {
                         pgp_sym_decrypt(email, $3::text)::text AS email,
                         active
                  FROM public.users 
-                 WHERE role IN ('Estudiante', 'Alumno', 'estudiante', 'alumno')
+                 WHERE role = 'Estudiante'
                  ORDER BY created_at DESC
                  LIMIT $1 OFFSET $2`,
                 [limit, offset, key]
