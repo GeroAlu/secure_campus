@@ -15,6 +15,8 @@ export default defineConfig({
         'application/command/AddMessageHandler.ts',
         'app/actions/roles.ts',
         'app/actions/sync-user.ts',
+        'app/api/chat/route.ts',
+        'app/api/student/list/route.ts',
       ],
     },
   },
