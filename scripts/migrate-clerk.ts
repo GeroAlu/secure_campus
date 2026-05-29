@@ -56,6 +56,21 @@ async function migrate() {
       continue;
     }
 
+    // Si el usuario no tiene rol en Clerk, se lo asignamos como 'Estudiante'
+    if (!user.publicMetadata?.role) {
+      try {
+        const client = await clerkClient();
+        await client.users.updateUserMetadata(clerkId, {
+          publicMetadata: {
+            role: 'Estudiante'
+          }
+        });
+        console.log(`Updated Clerk metadata for ${email} to Estudiante.`);
+      } catch (metadataError) {
+        console.error(`Error updating Clerk metadata for ${email}:`, metadataError);
+      }
+    }
+
     try {
       await pool.query(
         `INSERT INTO public.users (clerk_id, first_name, last_name, email, role) 
