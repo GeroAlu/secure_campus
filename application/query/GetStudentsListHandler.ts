@@ -1,4 +1,14 @@
-import pool from '../../lib/db';
+import pool, { getEncryptionKey } from '../../lib/db';
+import { paginationSchema } from '../../lib/validation';
+
+interface DBUserRowRaw {
+    id: string;
+    clerk_id?: string | null;
+    first_name?: string | null;
+    last_name?: string | null;
+    email?: string | null;
+    active: boolean;
+}
 
 export class GetStudentsListHandler {
 
@@ -6,28 +16,36 @@ export class GetStudentsListHandler {
         let students: Student[] = [];
         let totalItems = 0;
         
-        const page = command.page || 1;
-        const limit = command.limit || 10;
+        const parsed = paginationSchema.safeParse({ page: command.page, limit: command.limit });
+        if (!parsed.success) {
+            throw new Error(`Invalid pagination: ${JSON.stringify(parsed.error.flatten().fieldErrors)}`);
+        }
+        const { page, limit } = parsed.data;
         const offset = (page - 1) * limit;
+        const key = getEncryptionKey();
 
         try {
-            // Count total students (Estudiante or Alumno)
             const countResult = await pool.query(
                 `SELECT COUNT(*) FROM public.users WHERE role IN ('Estudiante', 'Alumno', 'estudiante', 'alumno')`
             );
             totalItems = parseInt(countResult.rows[0].count, 10);
 
-            // Fetch paginated students
-            const usersResult = await pool.query(
-                `SELECT * FROM public.users 
+            const usersResult = await pool.query<DBUserRowRaw>(
+                `SELECT id,
+                        pgp_sym_decrypt(clerk_id, $3::text)::text AS clerk_id,
+                        first_name,
+                        last_name,
+                        pgp_sym_decrypt(email, $3::text)::text AS email,
+                        active
+                 FROM public.users 
                  WHERE role IN ('Estudiante', 'Alumno', 'estudiante', 'alumno')
                  ORDER BY created_at DESC
                  LIMIT $1 OFFSET $2`,
-                [limit, offset]
+                [limit, offset, key]
             );
 
-            students = usersResult.rows.map((row: any) => ({
-                id: row.clerk_id || row.id, // Fallback to uuid if no clerk_id
+            students = usersResult.rows.map((row: DBUserRowRaw) => ({
+                id: row.clerk_id || row.id,
                 name: `${row.first_name || ''} ${row.last_name || ''}`.trim() || 'Sin Nombre',
                 email: row.email || '',
                 active: row.active,

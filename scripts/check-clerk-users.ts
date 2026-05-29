@@ -8,7 +8,6 @@ async function checkDiscrepancies() {
     const dbRes = await pool.query('SELECT clerk_id, email, first_name, last_name FROM public.users;');
     const dbUsers = dbRes.rows;
     const dbClerkIds = new Set(dbUsers.map(u => u.clerk_id));
-    const dbEmails = new Set(dbUsers.map(u => u.email));
 
     console.log(`Supabase has ${dbUsers.length} users.`);
 

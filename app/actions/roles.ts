@@ -2,6 +2,7 @@
 
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { getPermissionsForRole } from '../utils/permissions'
+import { roleActionSchema } from '../../lib/validation'
 
 export async function hasPermission(requiredPermission: string) {
     const { userId } = await auth()
@@ -43,19 +44,22 @@ export async function getUsers() {
 
 export async function setRole(targetUserId: string, targetRole: string) {
     try {
+        const parsed = roleActionSchema.safeParse({ targetUserId, targetRole })
+        if (!parsed.success) {
+            throw new Error(`Invalid arguments: ${JSON.stringify(parsed.error.flatten().fieldErrors)}`)
+        }
+
         const { userId: myId } = await auth()
         if (!myId) throw new Error("Unauthenticated")
 
-        // 1. Verificación universal: no puedes editarte a ti mismo
-        if (myId === targetUserId) throw new Error("Cannot edit yourself")
+        if (myId === parsed.data.targetUserId) throw new Error("Cannot edit yourself")
 
         const canManageRoles = await hasPermission('manage:roles')
         if (!canManageRoles) throw new Error("Unauthorized")
 
         const client = await clerkClient()
         
-        // 2. Verificación PBAC: ¿El objetivo ya es un administrador?
-        const targetUser = await client.users.getUser(targetUserId)
+        const targetUser = await client.users.getUser(parsed.data.targetUserId)
         const targetCurrentRole = targetUser.publicMetadata?.role as string | null
         const targetCurrentPermissions = getPermissionsForRole(targetCurrentRole)
         
@@ -63,9 +67,9 @@ export async function setRole(targetUserId: string, targetRole: string) {
             throw new Error("Cannot modify a user who possesses the manage:roles permission")
         }
 
-        await client.users.updateUserMetadata(targetUserId, {
+        await client.users.updateUserMetadata(parsed.data.targetUserId, {
             publicMetadata: {
-                role: targetRole
+                role: parsed.data.targetRole
             }
         })
         return { success: true }
