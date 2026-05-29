@@ -15,47 +15,69 @@ async function migrate() {
   await pool.query('CREATE EXTENSION IF NOT EXISTS pgaudit');
   await pool.query(`ALTER ROLE postgres SET pgaudit.log = 'write'`);
 
+  const key = getEncryptionKey();
+
   console.log('--- Initializing database schema ---');
-  const createTableQuery = `
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS public.users (
       id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
       clerk_id BYTEA,
-      clerk_id_hash TEXT UNIQUE,
+      clerk_id_hash TEXT,
       first_name VARCHAR(255),
       last_name VARCHAR(255),
       email BYTEA NOT NULL,
-      email_hash TEXT UNIQUE NOT NULL,
+      email_hash TEXT,
       role VARCHAR(50) DEFAULT 'Estudiante',
       active BOOLEAN DEFAULT true,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
     );
-  `;
+  `);
+  console.log('Table ensured.');
 
-  try {
-    await pool.query(createTableQuery);
-    console.log('Schema created or already exists.');
-  } catch (error) {
-    console.error('Error creating schema:', error);
-    process.exit(1);
-  }
+  console.log('--- Migrating existing schema if needed ---');
+  // Add hash columns if table existed before this migration
+  await pool.query(`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS clerk_id_hash TEXT`);
+  await pool.query(`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS email_hash TEXT`);
 
-  const key = getEncryptionKey();
-
-  console.log('--- Migrating existing data to encrypted format ---');
-  try {
-    const migrateResult = await pool.query(
-      `UPDATE public.users SET
-         clerk_id = pgp_sym_encrypt(clerk_id::text, $1::text),
-         clerk_id_hash = encode(digest(clerk_id::text, 'sha256'), 'hex'),
-         email = pgp_sym_encrypt(email::text, $1::text),
-         email_hash = encode(digest(email::text, 'sha256'), 'hex')
-       WHERE email_hash IS NULL`,
-      [key]
+  // Convert VARCHAR columns to BYTEA if they haven't been converted yet
+  const { rows: clerkCol } = await pool.query(
+    `SELECT data_type FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'clerk_id'`
+  );
+  if (clerkCol[0]?.data_type === 'character varying') {
+    console.log('Converting clerk_id VARCHAR → BYTEA...');
+    await pool.query(
+      `ALTER TABLE public.users ALTER COLUMN clerk_id TYPE BYTEA
+       USING pgp_sym_encrypt(coalesce(clerk_id, '')::text, '${key}')`
     );
-    console.log(`Migrated ${migrateResult.rowCount} existing rows.`);
-  } catch (error) {
-    console.error('Error migrating existing data:', error);
   }
+
+  const { rows: emailCol } = await pool.query(
+    `SELECT data_type FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'email'`
+  );
+  if (emailCol[0]?.data_type === 'character varying') {
+    console.log('Converting email VARCHAR → BYTEA...');
+    await pool.query(
+      `ALTER TABLE public.users ALTER COLUMN email TYPE BYTEA
+       USING pgp_sym_encrypt(email::text, '${key}')`
+    );
+  }
+
+  console.log('--- Backfilling hashes for existing rows ---');
+  const migrateResult = await pool.query(
+    `UPDATE public.users SET
+       clerk_id_hash = encode(digest(coalesce(pgp_sym_decrypt(clerk_id, $1::text), ''), 'sha256'), 'hex'),
+       email_hash = encode(digest(pgp_sym_decrypt(email, $1::text), 'sha256'), 'hex')
+     WHERE email_hash IS NULL`,
+    [key]
+  );
+  console.log(`Backfilled hashes for ${migrateResult.rowCount} rows.`);
+
+  console.log('--- Enforcing constraints ---');
+  await pool.query(`ALTER TABLE public.users ALTER COLUMN email_hash SET NOT NULL`);
+  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS users_email_hash_unique ON public.users(email_hash)`);
+  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS users_clerk_id_hash_unique ON public.users(clerk_id_hash) WHERE clerk_id_hash IS NOT NULL`);
 
   console.log('--- Fetching users from Clerk ---');
   let clerkUsers;
