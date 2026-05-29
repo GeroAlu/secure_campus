@@ -13,7 +13,7 @@ async function migrate() {
 
   console.log('--- Enabling pgaudit extension ---');
   await pool.query('CREATE EXTENSION IF NOT EXISTS pgaudit');
-  await pool.query(`ALTER DATABASE postgres SET pgaudit.log = 'write'`);
+  await pool.query(`ALTER ROLE postgres SET pgaudit.log = 'write'`);
 
   const key = getEncryptionKey();
 
