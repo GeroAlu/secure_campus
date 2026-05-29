@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { AddMessageHandler, AddMessageCommand, AddMessageResponse } from '@/application/command/AddMessageHandler'
+import { AddMessageHandler, AddMessageCommand } from '@/application/command/AddMessageHandler'
+import { chatMessageSchema } from '@/lib/validation'
 
 const addMessageCommandHandler = async (request: NextRequest): Promise<NextResponse> => {
     try {
         const handler = new AddMessageHandler()
         
-        const command: AddMessageCommand = await request.json()
+        const body = await request.json()
+        const parsed = chatMessageSchema.safeParse(body)
+        if (!parsed.success) {
+            return NextResponse.json(
+                { error: "Mensaje inválido", details: parsed.error.flatten().fieldErrors },
+                { status: 400 }
+            )
+        }
+        
+        const command: AddMessageCommand = { message: parsed.data.message }
         const response = await handler.handle(command)
 
         return NextResponse.json(response)

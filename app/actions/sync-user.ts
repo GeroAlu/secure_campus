@@ -1,26 +1,21 @@
 'use server'
 
 import { clerkClient } from '@clerk/nextjs/server'
-import pool from '@/lib/db'
+import pool, { getEncryptionKey } from '@/lib/db'
 
-/**
- * Garantiza que el usuario autenticado en Clerk exista en la base de datos de Supabase.
- * Se ejecuta pasivamente en la carga inicial de la aplicación.
- */
 export async function ensureUserSynced(userId: string) {
   try {
-    // 1. Verificar si el usuario ya existe en Supabase
+    const key = getEncryptionKey()
+
     const dbUserRes = await pool.query(
-      'SELECT id, role FROM public.users WHERE clerk_id = $1',
+      'SELECT id, role FROM public.users WHERE clerk_id_hash = encode(digest($1::text, \'sha256\'), \'hex\')',
       [userId]
     )
 
     if (dbUserRes.rowCount !== null && dbUserRes.rowCount > 0) {
-      // Ya existe en la base de datos local
       return
     }
 
-    // 2. Si no existe en Supabase, obtener los detalles desde Clerk
     const client = await clerkClient()
     const user = await client.users.getUser(userId)
 
@@ -34,7 +29,6 @@ export async function ensureUserSynced(userId: string) {
     const lastName = user.lastName || ''
     let role = user.publicMetadata?.role as string | undefined
 
-    // Si no tiene rol asignado en Clerk, se le asigna 'Estudiante'
     if (!role) {
       role = 'Estudiante'
       await client.users.updateUserMetadata(userId, {
@@ -45,16 +39,25 @@ export async function ensureUserSynced(userId: string) {
       console.log(`[Sync] Asignado rol 'Estudiante' en Clerk para el usuario: ${email}`)
     }
 
-    // 3. Guardar el usuario en la base de datos de Supabase
     await pool.query(
-      `INSERT INTO public.users (clerk_id, first_name, last_name, email, role) 
-       VALUES ($1, $2, $3, $4, $5) 
-       ON CONFLICT (email) DO UPDATE SET 
-         clerk_id = EXCLUDED.clerk_id,
-         first_name = EXCLUDED.first_name,
-         last_name = EXCLUDED.last_name,
-         role = EXCLUDED.role;`,
-      [userId, firstName, lastName, email, role]
+      `INSERT INTO public.users (clerk_id, clerk_id_hash, first_name, last_name, email, email_hash, role) 
+       VALUES (
+         pgp_sym_encrypt($1::text, $6::text),
+         encode(digest($1::text, 'sha256'), 'hex'),
+         $2, $3,
+         pgp_sym_encrypt($4::text, $6::text),
+         encode(digest($4::text, 'sha256'), 'hex'),
+         $5
+       )
+       ON CONFLICT (email_hash) DO UPDATE SET 
+         clerk_id = pgp_sym_encrypt($1::text, $6::text),
+         clerk_id_hash = encode(digest($1::text, 'sha256'), 'hex'),
+         first_name = $2,
+         last_name = $3,
+         email = pgp_sym_encrypt($4::text, $6::text),
+         email_hash = encode(digest($4::text, 'sha256'), 'hex'),
+         role = $5;`,
+      [userId, firstName, lastName, email, role, key]
     )
     console.log(`[Sync] Usuario ${email} sincronizado con éxito en Supabase`)
   } catch (error) {
