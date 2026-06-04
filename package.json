@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "sonar": "sonar-scanner",
-    "migrate": "tsx scripts/migrate-clerk.ts"
+    "migrate": "tsx scripts/migrate-clerk.ts",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.0.11",
@@ -28,12 +30,14 @@
     "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitest/coverage-v8": "^4.1.7",
     "eslint": "^9",
     "eslint-config-next": "16.2.0",
     "pdf-parse": "^2.4.5",
     "sonarqube-scanner": "^4.3.6",
     "tailwindcss": "^4",
     "tsx": "^4.22.3",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.7"
   }
 }

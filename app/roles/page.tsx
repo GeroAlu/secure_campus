@@ -58,16 +58,16 @@ export default function RolesPage() {
             cancelEditing();
             return;
         }
-        
+
         setUpdatingId(userId);
         setEditingUserId(null);
         setErrorMsg(null);
-        
+
         const result = await setRole(userId, selectedRoleForEdit)
         if (!result.success) {
             setErrorMsg("No tienes permisos para modificar a este usuario.");
         }
-        
+
         await fetchUsers()
         setUpdatingId(null);
     }
@@ -78,7 +78,7 @@ export default function RolesPage() {
         if (currentUser.id === targetUser.id) return false;
         // No editar a alguien que tenga rango mayor
         if (targetUser.permissions.includes("manage:roles") || targetUser.permissions.includes("*")) return false;
-        
+
         return true;
     }
 
@@ -136,18 +136,18 @@ export default function RolesPage() {
                                     <div className="flex items-center gap-4">
                                         <div className="flex-shrink-0 h-10 w-10 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">
                                             <span className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
-                                            {user.firstName ? user.firstName.charAt(0).toUpperCase() : 'U'}
+                                                {user.firstName ? user.firstName.charAt(0).toUpperCase() : 'U'}
                                             </span>
                                         </div>
                                         <div>
                                             <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{user.firstName} {user.lastName}</p>
-                                            <p className="text-xs text-zinc-500 dark:text-zinc-400">{user.email}</p>
+                                            {user.email && <MaskedEmail email={user.email} />}
                                         </div>
                                     </div>
                                     <div>
                                         {editingUserId === user.id ? (
                                             <div className="flex gap-2 items-center">
-                                                <select 
+                                                <select
                                                     value={selectedRoleForEdit}
                                                     onChange={(e) => setSelectedRoleForEdit(e.target.value)}
                                                     className="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 text-sm rounded-md border-r-8 border-transparent outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-500 cursor-pointer text-zinc-900 dark:text-zinc-100"
@@ -157,13 +157,13 @@ export default function RolesPage() {
                                                     <option value="Docente">Docente</option>
                                                     <option value="Administrador">Administrador</option>
                                                 </select>
-                                                <button 
+                                                <button
                                                     onClick={() => saveRoleAction(user.id, user.role)}
                                                     className="px-3 py-1.5 bg-zinc-900 dark:bg-zinc-100 text-zinc-100 dark:text-zinc-900 text-sm rounded-md hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors"
                                                 >
                                                     Guardar
                                                 </button>
-                                                <button 
+                                                <button
                                                     onClick={cancelEditing}
                                                     className="px-3 py-1.5 bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm rounded-md hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors"
                                                 >
@@ -176,7 +176,7 @@ export default function RolesPage() {
                                                     {user.role}
                                                 </span>
                                                 {isEditable(user) ? (
-                                                    <button 
+                                                    <button
                                                         disabled={updatingId === user.id}
                                                         onClick={() => startEditing(user)}
                                                         className="px-4 py-1.5 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-sm font-medium rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50"
@@ -198,3 +198,61 @@ export default function RolesPage() {
         </main>
     )
 }
+
+function MaskedEmail({ email }: { email: string }) {
+    const [secondsLeft, setSecondsLeft] = useState(0)
+
+    useEffect(() => {
+        if (secondsLeft <= 0) return
+
+        const timer = setTimeout(() => {
+            setSecondsLeft(prev => prev - 1)
+        }, 1000)
+
+        return () => clearTimeout(timer)
+    }, [secondsLeft])
+
+    const isRevealed = secondsLeft > 0
+    // Creamos el texto enmascarado con caracteres '*' con la misma longitud que el email
+    const maskedText = "*".repeat(email.length)
+
+    return (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 mt-0.5">
+            <div className="flex items-center gap-2">
+                <span
+                    className={`text-xs ${isRevealed
+                            ? "text-zinc-500 dark:text-zinc-400 select-all font-medium"
+                            : "text-zinc-400 dark:text-zinc-500 font-mono tracking-wider select-none"
+                        }`}
+                >
+                    {isRevealed ? email : maskedText}
+                </span>
+                <button
+                    onClick={() => setSecondsLeft(isRevealed ? 0 : 5)}
+                    className="p-0.5 rounded text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 focus:outline-none transition-colors cursor-pointer"
+                    title={isRevealed ? "Ocultar correo" : "Visualizar correo por 5 segundos"}
+                    aria-label={isRevealed ? "Ocultar correo" : "Visualizar correo"}
+                >
+                    {isRevealed ? (
+                        // Ojo tachado (ocultar)
+                        <svg className="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+                        </svg>
+                    ) : (
+                        // Ojo abierto (mostrar)
+                        <svg className="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                        </svg>
+                    )}
+                </button>
+            </div>
+            {isRevealed && (
+                <span className="text-[10px] sm:text-xs text-yellow-600 dark:text-yellow-500 font-medium select-none animate-pulse">
+                    El mail se ocultará en {secondsLeft}s
+                </span>
+            )}
+        </div>
+    )
+}
+
