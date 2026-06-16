@@ -25,14 +25,11 @@ export class GetStudentsListHandler {
         const offset = (page - 1) * limit;
         const key = getEncryptionKey();
 
-        try {
-            const countResult = await pool.query(
-                `SELECT COUNT(*) FROM public.users WHERE role = 'Estudiante'`
-            );
-            totalItems = parseInt(countResult.rows[0].count, 10);
+        const includeInactive = command.includeInactive ?? true;
 
-            const usersResult = await pool.query<DBUserRowRaw>(
-                `SELECT id,
+        try {
+            let countQuery = `SELECT COUNT(*) FROM public.users WHERE role = 'Estudiante'`;
+            let usersQuery = `SELECT id,
                         pgp_sym_decrypt(clerk_id, $3::text)::text AS clerk_id,
                         first_name,
                         last_name,
@@ -40,9 +37,20 @@ export class GetStudentsListHandler {
                         active,
                         detail
                  FROM public.users 
-                 WHERE role = 'Estudiante'
-                 ORDER BY created_at DESC
-                 LIMIT $1 OFFSET $2`,
+                 WHERE role = 'Estudiante'`;
+
+            if (!includeInactive) {
+                countQuery += ` AND active = true`;
+                usersQuery += ` AND active = true`;
+            }
+
+            usersQuery += ` ORDER BY created_at DESC LIMIT $1 OFFSET $2`;
+
+            const countResult = await pool.query(countQuery);
+            totalItems = parseInt(countResult.rows[0].count, 10);
+
+            const usersResult = await pool.query<DBUserRowRaw>(
+                usersQuery,
                 [limit, offset, key]
             );
 
@@ -71,6 +79,7 @@ export class GetStudentsListHandler {
 export interface GetStudentsListQuery {
     page?: number;
     limit?: number;
+    includeInactive?: boolean;
 }
 
 export interface GetStudentsListResponse {

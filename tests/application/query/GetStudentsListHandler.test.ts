@@ -82,6 +82,27 @@ describe('GetStudentsListHandler', () => {
     expect(mockQuery.mock.calls[1][1]).toEqual([5, 5, 'mock-encryption-key']); // limit=5, offset=5, key
   });
 
+  it('should filter out inactive students when includeInactive is false', async () => {
+    const query: GetStudentsListQuery = {
+      page: 1,
+      limit: 5,
+      includeInactive: false,
+    };
+
+    const countMock = { rows: [{ count: '2' }] };
+    const usersMock = { rows: [] };
+
+    const mockQuery = (vi.mocked(pool.query) as Mock)
+      .mockResolvedValueOnce(countMock)
+      .mockResolvedValueOnce(usersMock);
+
+    await handler.handle(query);
+
+    expect(mockQuery).toHaveBeenCalledTimes(2);
+    expect(mockQuery.mock.calls[0][0]).toContain('AND active = true');
+    expect(mockQuery.mock.calls[1][0]).toContain('AND active = true');
+  });
+
   it('should fallback to defaults when page and limit are missing', async () => {
     const query: GetStudentsListQuery = {};
 
