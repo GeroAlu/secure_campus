@@ -35,11 +35,8 @@ async function migrate() {
   console.log('Table ensured.');
 
   console.log('--- Migrating existing schema if needed ---');
-  // Add hash columns if table existed before this migration
   await pool.query(`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS clerk_id_hash TEXT`);
   await pool.query(`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS email_hash TEXT`);
-
-  // Convert VARCHAR columns to BYTEA if they haven't been converted yet
   const { rows: clerkCol } = await pool.query(
     `SELECT data_type FROM information_schema.columns
      WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'clerk_id'`

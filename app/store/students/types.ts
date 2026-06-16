@@ -4,6 +4,7 @@ export interface Student {
   name: string
   email: string
   active: boolean
+  detail?: string | null
 }
 
 export interface StudentsStore {
@@ -14,4 +15,5 @@ export interface StudentsStore {
 
   setStudents: (students: Student[]) => void
   setPagination: (currentPage: number, totalPages: number, totalItems: number) => void
+  updateStudentDetail: (studentId: string, detail: string) => void
 }

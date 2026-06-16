@@ -16,7 +16,7 @@ vi.mock('@/application/query/GetStudentsListHandler', () => {
 vi.mock('@/app/lib/withPermission', () => {
   return {
     withPermission: vi.fn((permission, handler) => {
-      return async (req: any, context: any) => {
+      return async (req: NextRequest, context: unknown) => {
         return handler(req, {
           userId: 'user_123',
           role: mockUserRolePassedToWithPermission,
@@ -71,15 +71,16 @@ describe('Student List API Route (GET)', () => {
     expect(mockHandle).toHaveBeenCalledWith({ page: 1, limit: 10 });
   });
 
-  it('should successfully obfuscate student emails for non-admins (students)', async () => {
-    mockUserRolePassedToWithPermission = 'student';
+  it('should successfully obfuscate student emails and other details for non-admins (students), but allow viewing own detail', async () => {
+    mockUserRolePassedToWithPermission = 'student'; // mock user ID is 'user_123'
     const studentListResponse = {
       list: [
-        { id: '1', name: 'John Doe', email: 'john@example.com', active: true },
+        { id: 'other_student', name: 'John Doe', email: 'john@example.com', active: true, detail: 'Secret info' },
+        { id: 'user_123', name: 'Jane Smith', email: 'jane@example.com', active: true, detail: 'My own comment' },
       ],
       totalPages: 1,
       currentPage: 1,
-      totalItems: 1,
+      totalItems: 2,
     };
     mockHandle.mockResolvedValue(studentListResponse);
 
@@ -90,7 +91,13 @@ describe('Student List API Route (GET)', () => {
     expect(res.status).toBe(200);
 
     const body = await res.json();
-    expect(body.list).toHaveLength(1);
-    expect(body.list[0].email).toBe(''); // Obfuscated!
+    expect(body.list).toHaveLength(2);
+    // Emails are obfuscated for both
+    expect(body.list[0].email).toBe('');
+    expect(body.list[1].email).toBe('');
+    // Detail for other student is null
+    expect(body.list[0].detail).toBeNull();
+    // Detail for logged-in student is visible
+    expect(body.list[1].detail).toBe('My own comment');
   });
 });

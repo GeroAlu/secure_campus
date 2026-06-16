@@ -4,8 +4,8 @@ import { useStudentApi } from '@/app/lib/clients/useStudentApi'
 
 export const useStudents = () => {
   
-    const { setStudents, setPagination } = useStudentsStore()
-    const { getStudentsList } = useStudentApi()
+    const { setStudents, setPagination, updateStudentDetail } = useStudentsStore()
+    const { getStudentsList, updateStudentDetail: apiUpdateDetail } = useStudentApi()
 
     const fetchStudents = useCallback(async (page: number = 1) => {
         const response = await getStudentsList(page)
@@ -15,7 +15,13 @@ export const useStudents = () => {
         }
     }, [getStudentsList, setStudents, setPagination])
 
+    const editStudentDetail = useCallback(async (studentId: string, detail: string) => {
+        await apiUpdateDetail(studentId, detail)
+        updateStudentDetail(studentId, detail)
+    }, [apiUpdateDetail, updateStudentDetail])
+
     return {
         fetchStudents,
+        editStudentDetail
     }
 }

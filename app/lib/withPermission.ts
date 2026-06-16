@@ -9,10 +9,10 @@ export interface UserInfo {
     jwt: string | null
 }
 
-type PermissionedHandler = (request: NextRequest, userInfo: UserInfo, context: any) => Promise<NextResponse> | NextResponse;
+type PermissionedHandler = (request: NextRequest, userInfo: UserInfo, context: unknown) => Promise<NextResponse> | NextResponse;
 
 export function withPermission(permission: PERMISSION, handler: PermissionedHandler) {
-    return async (request: NextRequest, context: any): Promise<NextResponse> => {
+    return async (request: NextRequest, context: unknown): Promise<NextResponse> => {
         try {
             const { userId } = await auth();
             if (!userId) {

@@ -10,6 +10,12 @@ export const useStudentsStore = create<StudentsStore>()(
     
     setStudents: (students: Student[]) => set({ students }),
     setPagination: (currentPage: number, totalPages: number, totalItems: number) => set({ currentPage, totalPages, totalItems }),
+    updateStudentDetail: (studentId: string, detail: string) =>
+      set(state => ({
+        students: state.students.map(s =>
+          s.id === studentId ? { ...s, detail } : s
+        ),
+      })),
   }),
 )
 

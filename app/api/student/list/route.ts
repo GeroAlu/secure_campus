@@ -20,11 +20,12 @@ const getStudentsListQueryHandler = async (request: NextRequest, userInfo: UserI
         const query: GetStudentsListQuery = { page: parsed.data.page, limit: parsed.data.limit }
         const response = await handler.handle(query)
 
-        // Si no tiene rol admin (Administrador, Docente, Auxiliar), ofuscar emails
+        // Si no tiene rol admin (Administrador, Docente, Auxiliar), ofuscar emails y detalles ajenos
         if (userInfo.role !== 'admin') {
             response.list = response.list.map(student => ({
                 ...student,
-                email: '' // Ocultamos el mail
+                email: '', // Ocultamos el mail
+                detail: student.id === userInfo.userId ? student.detail : null // Permitimos ver solo comentarios propios
             }))
         }
 

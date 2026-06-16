@@ -8,6 +8,7 @@ interface DBUserRowRaw {
     last_name?: string | null;
     email?: string | null;
     active: boolean;
+    detail?: string | null;
 }
 
 export class GetStudentsListHandler {
@@ -36,7 +37,8 @@ export class GetStudentsListHandler {
                         first_name,
                         last_name,
                         pgp_sym_decrypt(email, $3::text)::text AS email,
-                        active
+                        active,
+                        detail
                  FROM public.users 
                  WHERE role IN ('Estudiante', 'Alumno', 'estudiante', 'alumno')
                  ORDER BY created_at DESC
@@ -49,6 +51,7 @@ export class GetStudentsListHandler {
                 name: `${row.first_name || ''} ${row.last_name || ''}`.trim() || 'Sin Nombre',
                 email: row.email || '',
                 active: row.active,
+                detail: row.detail || null,
             }));
         } catch (e) {
             console.error("Error fetching users from Supabase", e);
@@ -82,4 +85,5 @@ export interface Student {
     name: string
     email: string
     active: boolean
+    detail: string | null
 }
