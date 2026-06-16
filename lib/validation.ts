@@ -20,3 +20,8 @@ export const roleActionSchema = z.object({
   targetUserId: z.string().min(1),
   targetRole: z.string().min(1),
 })
+
+export const updateStudentDetailSchema = z.object({
+  studentId: z.string().min(1),
+  detail: z.string(),
+})

@@ -1,23 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GetStudentsListHandler, GetStudentsListQuery } from '@/application/query/GetStudentsListHandler'
-import { getPermissionsForRole } from '@/app/utils/permissions'
-import { auth, clerkClient } from '@clerk/nextjs/server'
+import { withPermission, UserInfo } from '@/app/lib/withPermission'
+import { PERMISSION } from '@/domain/identity/permissions'
 import { paginationSchema } from '@/lib/validation'
 
-const getStudentsListQueryHandler = async (request: NextRequest): Promise<NextResponse> => {
+const getStudentsListQueryHandler = async (request: NextRequest, userInfo: UserInfo): Promise<NextResponse> => {
     try {
-        const { userId } = await auth()
-        if (!userId) {
-            return NextResponse.json({ error: "No autenticado" }, { status: 401 })
-        }
-
-        const client = await clerkClient()
-        const user = await client.users.getUser(userId)
-        const role = user.publicMetadata?.role as string | null
-        const permissions = getPermissionsForRole(role)
-
-        const handler = new GetStudentsListHandler()
-        
         const url = new URL(request.url)
         const params = Object.fromEntries(url.searchParams.entries())
         const parsed = paginationSchema.safeParse(params)
@@ -27,15 +15,17 @@ const getStudentsListQueryHandler = async (request: NextRequest): Promise<NextRe
                 { status: 400 }
             )
         }
-        
+
+        const handler = new GetStudentsListHandler()
         const query: GetStudentsListQuery = { page: parsed.data.page, limit: parsed.data.limit }
         const response = await handler.handle(query)
 
-        // Si no tiene permiso de ver detalles, ofuscar u ocultar emails
-        if (!permissions.includes('view:student_details') && !permissions.includes('*')) {
+        // Si no tiene rol admin (Administrador, Docente, Auxiliar), ofuscar emails y detalles ajenos
+        if (userInfo.role !== 'admin') {
             response.list = response.list.map(student => ({
                 ...student,
-                email: '' // Ocultamos el mail
+                email: '', // Ocultamos el mail
+                detail: student.id === userInfo.userId ? student.detail : null // Permitimos ver solo comentarios propios
             }))
         }
 
@@ -49,4 +39,4 @@ const getStudentsListQueryHandler = async (request: NextRequest): Promise<NextRe
     }
 }
 
-export const GET = getStudentsListQueryHandler
+export const GET = withPermission(PERMISSION.STUDENTS_LIST, getStudentsListQueryHandler)

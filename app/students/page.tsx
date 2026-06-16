@@ -5,9 +5,11 @@ import { useStudents } from "@/app/hooks/useStudents"
 import { useStudentsStore, Student } from "@/app/store/students"
 import { useUser } from '@clerk/nextjs'
 import { getPermissionsForRole } from "../utils/permissions"
+import { StudentDetailEditor } from "./components/StudentDetailEditor"
+import { DniViewer } from "./components/DniViewer"
 
 export default function StudentsPage() {
-  const { fetchStudents } = useStudents()
+  const { fetchStudents, editStudentDetail } = useStudents()
   const { students, currentPage, totalPages, totalItems } = useStudentsStore()
   const [isLoading, setIsLoading] = useState(true)
   const { user } = useUser()
@@ -29,15 +31,15 @@ export default function StudentsPage() {
   }, [fetchStudents])
 
   const handlePageChange = async (newPage: number) => {
-      if(newPage < 1 || newPage > totalPages) return;
-      setIsLoading(true);
-      try {
-          await fetchStudents(newPage);
-      } catch (error) {
-          console.error("Error fetching students:", error);
-      } finally {
-          setIsLoading(false);
-      }
+    if (newPage < 1 || newPage > totalPages) return;
+    setIsLoading(true);
+    try {
+      await fetchStudents(newPage);
+    } catch (error) {
+      console.error("Error fetching students:", error);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -72,42 +74,54 @@ export default function StudentsPage() {
               <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
                 {students.map((student: Student) => (
                   <li key={student.id} className="p-4 sm:p-6 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-4 flex-1 min-w-0">
                         <div className="flex-shrink-0 h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center"><span className="text-lg font-medium text-zinc-600 dark:text-zinc-300">{student.name.charAt(0).toUpperCase()}</span></div>
-                        <div>
+                        <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{student.name}</p>
                           {student.email && <p className="text-sm text-zinc-500 dark:text-zinc-400">{student.email}</p>}
+                          {permissions.includes('view:student_details') && (
+                            <DniViewer studentId={student.id} />
+                          )}
+                          {permissions.includes('view:student_details') && (
+                            <StudentDetailEditor student={student} onSave={editStudentDetail} />
+                          )}
+                          {student.id === user?.id && !permissions.includes('view:student_details') && student.detail && (
+                            <div className="mt-2 text-sm text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/40 p-2.5 rounded-lg border border-zinc-200/60 dark:border-zinc-800/60">
+                              <span className="font-semibold text-zinc-600 dark:text-zinc-300 block mb-0.5">Mis comentarios:</span>
+                              <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed">{student.detail}</p>
+                            </div>
+                          )}
                         </div>
                       </div>
                       {permissions.includes('deactivate:students') && (
-                         <button className="text-xs text-red-600 hover:text-red-700 hover:underline">Dar de baja</button>
+                        <button className="text-xs text-red-600 hover:text-red-700 hover:underline flex-shrink-0 mt-1">Dar de baja</button>
                       )}
                     </div>
                   </li>
                 ))}
               </ul>
-              
+
               {/* Pagination controls */}
               {totalPages > 1 && (
                 <div className="flex items-center justify-between px-6 py-4 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 mt-auto">
-                    <button 
-                        onClick={() => handlePageChange(currentPage - 1)}
-                        disabled={currentPage === 1}
-                        className="px-4 py-2 border border-zinc-300 dark:border-zinc-700 rounded-md text-sm font-medium text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        Anterior
-                    </button>
-                    <span className="text-sm text-zinc-600 dark:text-zinc-400">
-                        Página <span className="font-medium text-zinc-900 dark:text-zinc-100">{currentPage}</span> de <span className="font-medium text-zinc-900 dark:text-zinc-100">{totalPages}</span>
-                    </span>
-                    <button 
-                        onClick={() => handlePageChange(currentPage + 1)}
-                        disabled={currentPage === totalPages}
-                        className="px-4 py-2 border border-zinc-300 dark:border-zinc-700 rounded-md text-sm font-medium text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        Siguiente
-                    </button>
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="px-4 py-2 border border-zinc-300 dark:border-zinc-700 rounded-md text-sm font-medium text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Anterior
+                  </button>
+                  <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                    Página <span className="font-medium text-zinc-900 dark:text-zinc-100">{currentPage}</span> de <span className="font-medium text-zinc-900 dark:text-zinc-100">{totalPages}</span>
+                  </span>
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="px-4 py-2 border border-zinc-300 dark:border-zinc-700 rounded-md text-sm font-medium text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Siguiente
+                  </button>
                 </div>
               )}
             </div>

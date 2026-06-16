@@ -65,6 +65,7 @@ describe('GetStudentsListHandler', () => {
       name: 'Alice Jones',
       email: 'alice@example.com',
       active: true,
+      detail: null,
     });
 
     expect(response.list[1]).toEqual({
@@ -72,6 +73,7 @@ describe('GetStudentsListHandler', () => {
       name: 'Bob',
       email: 'bob@example.com',
       active: false,
+      detail: null,
     });
 
     expect(mockQuery).toHaveBeenCalledTimes(2);

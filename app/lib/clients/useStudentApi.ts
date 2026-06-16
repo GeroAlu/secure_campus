@@ -12,7 +12,12 @@ export const useStudentApi = () => {
         return api.get<GetStudentsListResponse>(`${BASE_URL}?page=${page}`)
     }, [])
 
+    const updateStudentDetail = useCallback(async (studentId: string, detail: string): Promise<void> => {
+        await api.patch(`/api/student/${studentId}/detail`, { detail })
+    }, [])
+
     return {
-        getStudentsList
+        getStudentsList,
+        updateStudentDetail
     }
 }
