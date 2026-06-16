@@ -68,7 +68,7 @@ describe('Student List API Route (GET)', () => {
     expect(body.list).toHaveLength(2);
     expect(body.list[0].email).toBe('john@example.com'); // Not obfuscated
     expect(body.list[1].email).toBe('jane@example.com');
-    expect(mockHandle).toHaveBeenCalledWith({ page: 1, limit: 10 });
+    expect(mockHandle).toHaveBeenCalledWith({ page: 1, limit: 10, includeInactive: true });
   });
 
   it('should successfully obfuscate student emails and other details for non-admins (students), but allow viewing own detail', async () => {

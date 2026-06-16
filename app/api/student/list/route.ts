@@ -17,7 +17,11 @@ const getStudentsListQueryHandler = async (request: NextRequest, userInfo: UserI
         }
 
         const handler = new GetStudentsListHandler()
-        const query: GetStudentsListQuery = { page: parsed.data.page, limit: parsed.data.limit }
+        const query: GetStudentsListQuery = {
+            page: parsed.data.page,
+            limit: parsed.data.limit,
+            includeInactive: userInfo.role === 'admin'
+        }
         const response = await handler.handle(query)
 
         // Si no tiene rol admin (Administrador, Docente, Auxiliar), ofuscar emails y detalles ajenos
