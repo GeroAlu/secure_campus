@@ -16,4 +16,5 @@ export interface StudentsStore {
   setStudents: (students: Student[]) => void
   setPagination: (currentPage: number, totalPages: number, totalItems: number) => void
   updateStudentDetail: (studentId: string, detail: string) => void
+  updateStudentActive: (studentId: string, active: boolean) => void
 }

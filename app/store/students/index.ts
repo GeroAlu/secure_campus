@@ -16,6 +16,12 @@ export const useStudentsStore = create<StudentsStore>()(
           s.id === studentId ? { ...s, detail } : s
         ),
       })),
+    updateStudentActive: (studentId: string, active: boolean) =>
+      set(state => ({
+        students: state.students.map(s =>
+          s.id === studentId ? { ...s, active } : s
+        ),
+      })),
   }),
 )
 

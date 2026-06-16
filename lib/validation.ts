@@ -25,3 +25,9 @@ export const updateStudentDetailSchema = z.object({
   studentId: z.string().min(1),
   detail: z.string(),
 })
+
+export const setStudentActiveSchema = z.object({
+  studentId: z.string().min(1),
+  active: z.boolean(),
+})
+

@@ -24,6 +24,7 @@ export function withPermission(permission: PERMISSION, handler: PermissionedHand
 
             const user = await currentUser();
             let role = (user?.publicMetadata?.role as string) ?? null;
+            const rawRole = role;
 
             // Normalizar roles de Clerk a los del dominio (admin, student)
             if (role === 'Administrador' || role === 'Docente' || role === 'Auxiliar docente') {
@@ -32,9 +33,12 @@ export function withPermission(permission: PERMISSION, handler: PermissionedHand
                 role = 'student';
             }
 
-            const hasPermission = !!role && PERMISSIONS_BY_ROLE.some(
+            let hasPermission = !!role && PERMISSIONS_BY_ROLE.some(
                 (p: PermissionMapping) => p.role === role && p.permission === permission
             );
+            if (permission === PERMISSION.STUDENT_DEACTIVATE && rawRole === 'Auxiliar docente') {
+                hasPermission = false;
+            }
             if (!hasPermission) {
                 return NextResponse.json(
                     { error: 'No tenés permiso para realizar esta acción.' },
