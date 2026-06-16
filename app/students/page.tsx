@@ -9,9 +9,10 @@ import { StudentDetailEditor } from "./components/StudentDetailEditor"
 import { DniViewer } from "./components/DniViewer"
 
 export default function StudentsPage() {
-  const { fetchStudents, editStudentDetail } = useStudents()
+  const { fetchStudents, editStudentDetail, toggleStudentActive } = useStudents()
   const { students, currentPage, totalPages, totalItems } = useStudentsStore()
   const [isLoading, setIsLoading] = useState(true)
+  const [updatingStudentId, setUpdatingStudentId] = useState<string | null>(null)
   const { user } = useUser()
   const role = user?.publicMetadata?.role as string | null
   const permissions = getPermissionsForRole(role)
@@ -78,7 +79,16 @@ export default function StudentsPage() {
                       <div className="flex items-start gap-4 flex-1 min-w-0">
                         <div className="flex-shrink-0 h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center"><span className="text-lg font-medium text-zinc-600 dark:text-zinc-300">{student.name.charAt(0).toUpperCase()}</span></div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{student.name}</p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className={`text-sm font-semibold ${student.active ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-400 dark:text-zinc-500 line-through'}`}>
+                              {student.name}
+                            </p>
+                            {!student.active && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                                Inactivo
+                              </span>
+                            )}
+                          </div>
                           {student.email && <p className="text-sm text-zinc-500 dark:text-zinc-400">{student.email}</p>}
                           {permissions.includes('view:student_details') && (
                             <DniViewer studentId={student.id} />
@@ -95,7 +105,28 @@ export default function StudentsPage() {
                         </div>
                       </div>
                       {permissions.includes('deactivate:students') && (
-                        <button className="text-xs text-red-600 hover:text-red-700 hover:underline flex-shrink-0 mt-1">Dar de baja</button>
+                        <button
+                          disabled={updatingStudentId === student.id}
+                          onClick={async () => {
+                            setUpdatingStudentId(student.id);
+                            try {
+                              await toggleStudentActive(student.id, !student.active);
+                            } catch (e) {
+                              console.error(e);
+                            } finally {
+                              setUpdatingStudentId(null);
+                            }
+                          }}
+                          className={`text-xs font-semibold hover:underline flex-shrink-0 mt-1 cursor-pointer disabled:opacity-50 ${
+                            student.active ? 'text-red-600 hover:text-red-700' : 'text-green-600 hover:text-green-700'
+                          }`}
+                        >
+                          {updatingStudentId === student.id
+                            ? 'Procesando...'
+                            : student.active
+                            ? 'Dar de baja'
+                            : 'Dar de alta'}
+                        </button>
                       )}
                     </div>
                   </li>

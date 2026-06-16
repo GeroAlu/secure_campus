@@ -5,6 +5,7 @@ export enum PERMISSION {
     STUDENTS_LIST = 'students.list',
     STUDENT_DETAIL_EDIT = 'students.detail.edit',
     STUDENT_DNI_VIEW = 'students.dni.view',
+    STUDENT_DEACTIVATE = 'students.deactivate',
 }
 
 export interface PermissionMapping {
@@ -17,6 +18,7 @@ export const PERMISSIONS_BY_ROLE: PermissionMapping[] = [
     { role: ROLES.Admin, permission: PERMISSION.STUDENTS_LIST },
     { role: ROLES.Admin, permission: PERMISSION.STUDENT_DETAIL_EDIT },
     { role: ROLES.Admin, permission: PERMISSION.STUDENT_DNI_VIEW },
+    { role: ROLES.Admin, permission: PERMISSION.STUDENT_DEACTIVATE },
     { role: ROLES.Student, permission: PERMISSION.HOME_CHAT },
     { role: ROLES.Student, permission: PERMISSION.STUDENTS_LIST },
 ]

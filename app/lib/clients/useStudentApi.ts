@@ -16,8 +16,13 @@ export const useStudentApi = () => {
         await api.patch(`/api/student/${studentId}/detail`, { detail })
     }, [])
 
+    const updateStudentActive = useCallback(async (studentId: string, active: boolean): Promise<void> => {
+        await api.patch(`/api/student/${studentId}/active`, { active })
+    }, [])
+
     return {
         getStudentsList,
-        updateStudentDetail
+        updateStudentDetail,
+        updateStudentActive
     }
 }
