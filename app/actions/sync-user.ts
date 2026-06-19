@@ -45,7 +45,7 @@ export async function ensureUserSynced(userId: string) {
          pgp_sym_encrypt($1::text, $6::text),
          encode(digest($1::text, 'sha256'), 'hex'),
          $2, $3,
-         pgp_sym_encrypt($4::text, $6::text),
+         $4::text,
          encode(digest($4::text, 'sha256'), 'hex'),
          $5
        )
@@ -54,7 +54,7 @@ export async function ensureUserSynced(userId: string) {
          clerk_id_hash = encode(digest($1::text, 'sha256'), 'hex'),
          first_name = $2,
          last_name = $3,
-         email = pgp_sym_encrypt($4::text, $6::text),
+         email = $4::text,
          email_hash = encode(digest($4::text, 'sha256'), 'hex'),
          role = $5;`,
       [userId, firstName, lastName, email, role, key]

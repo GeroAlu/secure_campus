@@ -33,7 +33,7 @@ export class GetStudentsListHandler {
                         pgp_sym_decrypt(clerk_id, $3::text)::text AS clerk_id,
                         first_name,
                         last_name,
-                        pgp_sym_decrypt(email, $3::text)::text AS email,
+                        email,
                         active,
                         detail
                  FROM public.users 

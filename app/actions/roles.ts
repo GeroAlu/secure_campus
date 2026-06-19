@@ -34,7 +34,7 @@ export async function getUsers() {
                 pgp_sym_decrypt(clerk_id, $1::text)::text AS clerk_id,
                 first_name,
                 last_name,
-                pgp_sym_decrypt(email, $1::text)::text AS email,
+                email,
                 role
              FROM public.users
              ORDER BY created_at DESC`,

@@ -25,7 +25,7 @@ async function migrate() {
       clerk_id_hash TEXT,
       first_name VARCHAR(255),
       last_name VARCHAR(255),
-      email BYTEA NOT NULL,
+      email VARCHAR(255) NOT NULL,
       email_hash TEXT,
       role VARCHAR(50) DEFAULT 'Estudiante',
       active BOOLEAN DEFAULT true,
@@ -53,11 +53,11 @@ async function migrate() {
     `SELECT data_type FROM information_schema.columns
      WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'email'`
   );
-  if (emailCol[0]?.data_type === 'character varying') {
-    console.log('Converting email VARCHAR → BYTEA...');
+  if (emailCol[0]?.data_type === 'bytea') {
+    console.log('Converting email BYTEA → VARCHAR...');
     await pool.query(
-      `ALTER TABLE public.users ALTER COLUMN email TYPE BYTEA
-       USING pgp_sym_encrypt(email::text, '${key}')`
+      `ALTER TABLE public.users ALTER COLUMN email TYPE VARCHAR(255)
+       USING pgp_sym_decrypt(email, '${key}')`
     );
   }
 
@@ -65,7 +65,7 @@ async function migrate() {
   const migrateResult = await pool.query(
     `UPDATE public.users SET
        clerk_id_hash = encode(digest(coalesce(pgp_sym_decrypt(clerk_id, $1::text), ''), 'sha256'), 'hex'),
-       email_hash = encode(digest(pgp_sym_decrypt(email, $1::text), 'sha256'), 'hex')
+       email_hash = encode(digest(email, 'sha256'), 'hex')
      WHERE email_hash IS NULL`,
     [key]
   );
@@ -123,7 +123,7 @@ async function migrate() {
            pgp_sym_encrypt($1::text, $6::text),
            encode(digest($1::text, 'sha256'), 'hex'),
            $2, $3,
-           pgp_sym_encrypt($4::text, $6::text),
+           $4::text,
            encode(digest($4::text, 'sha256'), 'hex'),
            $5
          )
@@ -132,7 +132,7 @@ async function migrate() {
            clerk_id_hash = encode(digest($1::text, 'sha256'), 'hex'),
            first_name = $2,
            last_name = $3,
-           email = pgp_sym_encrypt($4::text, $6::text),
+           email = $4::text,
            email_hash = encode(digest($4::text, 'sha256'), 'hex'),
            role = $5;`,
         [clerkId, firstName, lastName, email, role, key]
